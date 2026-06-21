@@ -55,7 +55,7 @@ export const DAILY_VARS = [
   "wind_speed_10m_max","wind_speed_10m_mean","wind_speed_10m_min",
   "wind_gusts_10m_max","wind_gusts_10m_mean","wind_gusts_10m_min",
   "wind_direction_10m_dominant","shortwave_radiation_sum",
-  "et0_fao_evapotranspiration","et0_fao_evapotranspiration_sum",
+  "et0_fao_evapotranspiration",
   "cape_mean","cape_max","cape_min",
   "cloud_cover_mean","cloud_cover_max","cloud_cover_min",
   "dew_point_2m_mean","dew_point_2m_max","dew_point_2m_min",
@@ -65,7 +65,7 @@ export const DAILY_VARS = [
   "visibility_mean","visibility_max","visibility_min",
   "wet_bulb_temperature_2m_mean","wet_bulb_temperature_2m_max","wet_bulb_temperature_2m_min",
   "vapour_pressure_deficit_max","snowfall_water_equivalent_sum",
-  "growing_degree_days_base_0_limit_50","leaf_wetness_probability_mean","updraft_max",
+  "growing_degree_days_base_0_limit_50","leaf_wetness_probability_mean",
 ];
 
 // Human-readable labels
