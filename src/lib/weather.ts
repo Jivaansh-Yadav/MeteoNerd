@@ -1,39 +1,23 @@
-import { CURRENT_VARS, DAILY_VARS, MINUTELY_VARS, HOURLY_PRESSURE } from "./weather-params";
+import { CURRENT_VARS, DAILY_VARS, MINUTELY_VARS, HOURLY_BASE, HOURLY_PRESSURE } from "./weather-params";
 
-const HOURLY_CORE = [
-  "temperature_2m","relative_humidity_2m","dew_point_2m","apparent_temperature","wet_bulb_temperature_2m",
-  "temperature_80m","temperature_120m","temperature_180m",
-  "precipitation_probability","precipitation","rain","showers","snowfall","snow_depth",
-  "weather_code",
-  "wind_speed_10m","wind_speed_80m","wind_speed_120m","wind_speed_180m",
-  "wind_direction_10m","wind_direction_80m","wind_direction_120m","wind_direction_180m","wind_gusts_10m",
-  "pressure_msl","surface_pressure",
-  "cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high",
-];
+const CHUNK_SIZE = 10;
 
-const HOURLY_ATMOS = [
-  "visibility","evapotranspiration","et0_fao_evapotranspiration","vapour_pressure_deficit",
-  "cape","lifted_index","convective_inhibition","freezing_level_height","boundary_layer_height",
-  "total_column_integrated_water_vapour",
-  "shortwave_radiation","direct_radiation","diffuse_radiation","direct_normal_irradiance",
-  "global_tilted_irradiance","terrestrial_radiation",
-  "shortwave_radiation_instant","direct_radiation_instant","diffuse_radiation_instant",
-  "direct_normal_irradiance_instant","global_tilted_irradiance_instant","terrestrial_radiation_instant",
-  "uv_index","uv_index_clear_sky","is_day","sunshine_duration",
-  "soil_temperature_0cm","soil_temperature_6cm","soil_temperature_18cm","soil_temperature_54cm",
-  "soil_moisture_0_to_1cm","soil_moisture_1_to_3cm","soil_moisture_3_to_9cm","soil_moisture_9_to_27cm","soil_moisture_27_to_81cm",
-];
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 
 function buildUrl(lat: number, lon: number, model: string, extra: Record<string, string>) {
-  const params = new URLSearchParams({
+  const params: Record<string, string> = {
     latitude: String(lat),
     longitude: String(lon),
     timezone: "auto",
     forecast_days: "16",
-    models: model,
     ...extra,
-  });
-  return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+  };
+  if (model && model !== "auto") params.models = model;
+  return `https://api.open-meteo.com/v1/forecast?${new URLSearchParams(params).toString()}`;
 }
 
 async function fetchOne(url: string): Promise<any> {
@@ -43,6 +27,10 @@ async function fetchOne(url: string): Promise<any> {
     throw new Error(`Open-Meteo ${res.status}: ${text.slice(0, 200)}`);
   }
   return res.json();
+}
+
+async function safeFetch(url: string): Promise<any> {
+  return fetchOne(url).catch((e) => ({ __error: e instanceof Error ? e.message : String(e) }));
 }
 
 export interface WeatherResult {
@@ -62,58 +50,84 @@ export interface WeatherResult {
 }
 
 export async function fetchWeather(lat: number, lon: number, model: string): Promise<WeatherResult> {
-  const urls = {
-    core: buildUrl(lat, lon, model, {
-      current: CURRENT_VARS.join(","),
-      hourly: HOURLY_CORE.join(","),
-      daily: DAILY_VARS.join(","),
-    }),
-    atmos: buildUrl(lat, lon, model, { hourly: HOURLY_ATMOS.join(",") }),
-    pressure: buildUrl(lat, lon, model, { hourly: HOURLY_PRESSURE.join(",") }),
-    minutely: buildUrl(lat, lon, model, { minutely_15: MINUTELY_VARS.join(",") }),
-  };
+  // Build all chunked URLs
+  const currentChunks = chunk(CURRENT_VARS, CHUNK_SIZE);
+  const hourlyBaseChunks = chunk(HOURLY_BASE, CHUNK_SIZE);
+  const hourlyPressureChunks = chunk(HOURLY_PRESSURE, CHUNK_SIZE);
+  const dailyChunks = chunk(DAILY_VARS, CHUNK_SIZE);
+  const minutelyChunks = chunk(MINUTELY_VARS, CHUNK_SIZE);
 
-  const [core, atmos, pressure, minutely] = await Promise.all([
-    fetchOne(urls.core).catch(e => ({ __error: e instanceof Error ? e.message : String(e) })),
-    fetchOne(urls.atmos).catch(e => ({ __error: e instanceof Error ? e.message : String(e) })),
-    fetchOne(urls.pressure).catch(e => ({ __error: e instanceof Error ? e.message : String(e) })),
-    fetchOne(urls.minutely).catch(e => ({ __error: e instanceof Error ? e.message : String(e) })),
-  ]);
+  const currentUrls = currentChunks.map((c) => buildUrl(lat, lon, model, { current: c.join(",") }));
+  const hourlyBaseUrls = hourlyBaseChunks.map((c) => buildUrl(lat, lon, model, { hourly: c.join(",") }));
+  const hourlyPressureUrls = hourlyPressureChunks.map((c) => buildUrl(lat, lon, model, { hourly: c.join(",") }));
+  const dailyUrls = dailyChunks.map((c) => buildUrl(lat, lon, model, { daily: c.join(",") }));
+  const minutelyUrls = minutelyChunks.map((c) => buildUrl(lat, lon, model, { minutely_15: c.join(",") }));
+
+  const allUrls = [
+    ...currentUrls.map((u) => ({ kind: "current" as const, url: u })),
+    ...hourlyBaseUrls.map((u) => ({ kind: "hourlyBase" as const, url: u })),
+    ...hourlyPressureUrls.map((u) => ({ kind: "hourlyPressure" as const, url: u })),
+    ...dailyUrls.map((u) => ({ kind: "daily" as const, url: u })),
+    ...minutelyUrls.map((u) => ({ kind: "minutely" as const, url: u })),
+  ];
+
+  const results = await Promise.all(allUrls.map((u) => safeFetch(u.url)));
 
   const errors: WeatherResult["errors"] = {};
-  if (core.__error) errors.core = core.__error;
-  if (atmos.__error) errors.atmosphere = atmos.__error;
-  if (pressure.__error) errors.pressureLevels = pressure.__error;
-  if (minutely.__error) errors.minutely = minutely.__error;
+  let meta: any = {};
+  let current: any = {};
+  let current_units: any = {};
+  let hourly: any = {};
+  let hourly_units: any = {};
+  let daily: any = {};
+  let daily_units: any = {};
+  let minutely_15: any = {};
+  let minutely_15_units: any = {};
 
-  if (core.__error) {
-    throw new Error(`Core weather call failed: ${core.__error}`);
+  let coreErrCount = 0, atmosErrCount = 0, pressureErrCount = 0, minutelyErrCount = 0;
+
+  results.forEach((r, i) => {
+    const kind = allUrls[i].kind;
+    if (r.__error) {
+      if (kind === "current" || kind === "hourlyBase" || kind === "daily") {
+        coreErrCount++;
+        if (!errors.core) errors.core = r.__error;
+      } else if (kind === "hourlyPressure") {
+        pressureErrCount++;
+        if (!errors.pressureLevels) errors.pressureLevels = r.__error;
+      } else if (kind === "minutely") {
+        minutelyErrCount++;
+        if (!errors.minutely) errors.minutely = r.__error;
+      }
+      return;
+    }
+    if (!meta.latitude && r.latitude !== undefined) {
+      meta = { latitude: r.latitude, longitude: r.longitude, timezone: r.timezone, elevation: r.elevation };
+    }
+    if (r.current) Object.assign(current, r.current);
+    if (r.current_units) Object.assign(current_units, r.current_units);
+    if (r.hourly) Object.assign(hourly, r.hourly);
+    if (r.hourly_units) Object.assign(hourly_units, r.hourly_units);
+    if (r.daily) Object.assign(daily, r.daily);
+    if (r.daily_units) Object.assign(daily_units, r.daily_units);
+    if (r.minutely_15) Object.assign(minutely_15, r.minutely_15);
+    if (r.minutely_15_units) Object.assign(minutely_15_units, r.minutely_15_units);
+  });
+
+  if (Object.keys(hourly).length === 0 && coreErrCount > 0) {
+    throw new Error(`Core weather call failed: ${errors.core}`);
   }
 
-  const hourly = {
-    ...(core.hourly ?? {}),
-    ...(atmos.__error ? {} : atmos.hourly ?? {}),
-    ...(pressure.__error ? {} : pressure.hourly ?? {}),
-  };
-  const hourly_units = {
-    ...(core.hourly_units ?? {}),
-    ...(atmos.__error ? {} : atmos.hourly_units ?? {}),
-    ...(pressure.__error ? {} : pressure.hourly_units ?? {}),
-  };
-
   return {
-    latitude: core.latitude,
-    longitude: core.longitude,
-    timezone: core.timezone,
-    elevation: core.elevation,
-    current: core.current,
-    current_units: core.current_units,
-    daily: core.daily,
-    daily_units: core.daily_units,
+    ...meta,
+    current,
+    current_units,
     hourly,
     hourly_units,
-    minutely_15: minutely.__error ? undefined : minutely.minutely_15,
-    minutely_15_units: minutely.__error ? undefined : minutely.minutely_15_units,
+    daily,
+    daily_units,
+    minutely_15: minutelyErrCount === minutelyUrls.length ? undefined : minutely_15,
+    minutely_15_units: minutelyErrCount === minutelyUrls.length ? undefined : minutely_15_units,
     errors,
   };
 }
