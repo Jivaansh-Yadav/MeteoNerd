@@ -20,17 +20,82 @@ function buildUrl(lat: number, lon: number, model: string, extra: Record<string,
   return `https://api.open-meteo.com/v1/forecast?${new URLSearchParams(params).toString()}`;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchOne(url: string): Promise<any> {
   const res = await fetch(url);
+
+  if (res.status === 429) {
+    const retryAfter = res.headers.get("Retry-After");
+    const error: any = new Error("429");
+    error.retryAfter = retryAfter;
+    throw error;
+  }
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Open-Meteo ${res.status}: ${text.slice(0, 200)}`);
   }
+
   return res.json();
 }
 
 async function safeFetch(url: string): Promise<any> {
-  return fetchOne(url).catch((e) => ({ __error: e instanceof Error ? e.message : String(e) }));
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await fetchOne(url);
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+
+      if (msg === "429") {
+        const retryAfter =
+          Number(e.retryAfter) > 0
+            ? Number(e.retryAfter) * 1000
+            : 1000 * Math.pow(2, attempt);
+
+        await sleep(retryAfter);
+        continue;
+      }
+
+      return { __error: msg };
+    }
+  }
+
+  return { __error: "Too many retries" };
+}
+
+async function fetchWithLimit(
+  urls: { kind: string; url: string }[],
+  concurrency = 3,
+  delayMs = 100
+) {
+  const results: any[] = new Array(urls.length);
+  let index = 0;
+
+  async function worker() {
+    while (true) {
+      const current = index++;
+
+      if (current >= urls.length) {
+        break;
+      }
+
+      results[current] = await safeFetch(urls[current].url);
+
+      await sleep(delayMs);
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(concurrency, urls.length) },
+      () => worker()
+    )
+  );
+
+  return results;
 }
 
 export interface WeatherResult {
@@ -71,7 +136,7 @@ export async function fetchWeather(lat: number, lon: number, model: string): Pro
     ...minutelyUrls.map((u) => ({ kind: "minutely" as const, url: u })),
   ];
 
-  const results = await Promise.all(allUrls.map((u) => safeFetch(u.url)));
+  const results = await fetchWithLimit(allUrls, 3, 100);
 
   const errors: WeatherResult["errors"] = {};
   let meta: any = {};
@@ -84,7 +149,9 @@ export async function fetchWeather(lat: number, lon: number, model: string): Pro
   let minutely_15: any = {};
   let minutely_15_units: any = {};
 
-  let coreErrCount = 0, atmosErrCount = 0, pressureErrCount = 0, minutelyErrCount = 0;
+  let coreErrCount = 0;
+  let pressureErrCount = 0;
+  let minutelyErrCount = 0;
 
   results.forEach((r, i) => {
     const kind = allUrls[i].kind;
