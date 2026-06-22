@@ -140,6 +140,12 @@ export function WeatherDisplay({ data, units, lat, lon }: Props) {
 
       {/* Upper Air */}
       <AccordionSection title="Upper Air / Pressure Levels" icon={<Layers size={16} />} accentColor="#8B5CF6">
+        {data.errors?.pressureLevels ? (
+          <div className="text-[12px] mono text-muted-foreground p-3 border border-border" style={{ borderRadius: 4 }}>
+            Pressure level data unavailable.
+            <div className="text-[10px] text-warning mt-1">{data.errors.pressureLevels}</div>
+          </div>
+        ) : (
         <div className="overflow-auto">
           <table className="w-full text-[12px] mono">
             <thead>
@@ -168,6 +174,7 @@ export function WeatherDisplay({ data, units, lat, lon }: Props) {
             </tbody>
           </table>
         </div>
+        )}
       </AccordionSection>
 
       {/* 15-Minutely */}
