@@ -1,29 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { COUNTRIES, LARGE_COUNTRIES } from "@/lib/countries";
+import { COUNTRIES } from "@/lib/countries";
 import { MapPin, Search, Crosshair, X } from "lucide-react";
 
 export type ResolvedLocation = { lat: number; lon: number; label: string };
 
-type Match = { indices: ReadonlyArray<readonly [number, number]>; key?: string };
-type Result = { item: { name: string; lat: number; lon: number }; matches?: Match[] };
+type PlaceResult = { name: string; lat: number; lon: number };
 
-function Highlight({ text, matches }: { text: string; matches?: Match[] }) {
-  if (!matches || matches.length === 0) return <>{text}</>;
-  const indices = matches[0].indices;
-  const parts: React.ReactNode[] = [];
-  let cursor = 0;
-  for (let i = 0; i < indices.length; i++) {
-    const [s, e] = indices[i];
-    if (s > cursor) parts.push(<span key={`p${i}`}>{text.slice(cursor, s)}</span>);
-    parts.push(<mark key={`m${i}`} className="mn-match">{text.slice(s, e + 1)}</mark>);
-    cursor = e + 1;
-  }
-  if (cursor < text.length) parts.push(<span key="end">{text.slice(cursor)}</span>);
-  return <>{parts}</>;
-}
+const PLACES_API = "https://meteonerd-places.jivaanshyadav.workers.dev/search";
 
 export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation) => void }) {
-  // Mode 1
+  // Mode 1 — Device
   const [geoError, setGeoError] = useState<string | null>(null);
   const geoSupported = typeof window !== "undefined" && "geolocation" in navigator;
 
@@ -37,7 +23,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
     );
   }
 
-  // Mode 2 — countries
+  // Mode 2 — Country + Place
   const [country, setCountry] = useState<string>("");
   const [countryQ, setCountryQ] = useState("");
   const [showCountryList, setShowCountryList] = useState(false);
@@ -45,61 +31,51 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
     ? COUNTRIES.filter(c => c.name.toLowerCase().includes(countryQ.toLowerCase()) || c.code.toLowerCase() === countryQ.toLowerCase())
     : COUNTRIES;
 
-  const workerRef = useRef<Worker | null>(null);
-  const [loadStatus, setLoadStatus] = useState<"idle"|"loading"|"ready"|"error">("idle");
-  const [progress, setProgress] = useState(0);
-  const [received, setReceived] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [placeCount, setPlaceCount] = useState(0);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
   const [placeQ, setPlaceQ] = useState("");
-  const [results, setResults] = useState<Result[]>([]);
+  const [results, setResults] = useState<PlaceResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reqIdRef = useRef(0);
 
-  function loadCountry(code: string) {
+  function selectCountry(code: string) {
     setCountry(code);
     setShowCountryList(false);
     setCountryQ(COUNTRIES.find(c => c.code === code)?.name || code);
-    setLoadStatus("loading");
-    setProgress(0); setReceived(0); setTotal(0); setLoadError(null);
-    setResults([]); setPlaceQ("");
-
-    if (workerRef.current) workerRef.current.terminate();
-    const w = new Worker(new URL("../../workers/places-worker.ts", import.meta.url), { type: "module" });
-    workerRef.current = w;
-    w.onmessage = (e: MessageEvent<any>) => {
-      const m = e.data;
-      if (m.type === "PROGRESS") {
-        setReceived(m.received); setTotal(m.total);
-        if (m.percent != null) setProgress(m.percent);
-      } else if (m.type === "READY") {
-        setLoadStatus("ready");
-        setPlaceCount(m.total);
-        setProgress(100);
-      } else if (m.type === "ERROR") {
-        setLoadStatus("error");
-        setLoadError(m.error);
-      } else if (m.type === "RESULTS") {
-        setResults(m.results);
-      }
-    };
-    const url = `https://raw.githubusercontent.com/Jivaansh-Yadav/MeteoNerd/main/places/${code}.txt.gz`;
-    w.postMessage({ type: "LOAD", countryCode: code, url });
+    setResults([]);
+    setPlaceQ("");
+    setSearchError(null);
   }
-
-  useEffect(() => () => { workerRef.current?.terminate(); }, []);
 
   function onSearch(q: string) {
     setPlaceQ(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.length < 2 || loadStatus !== "ready") { setResults([]); return; }
-    debounceRef.current = setTimeout(() => {
-      workerRef.current?.postMessage({ type: "SEARCH", query: q });
+    if (!country) return;
+    if (q.trim().length < 2) { setResults([]); setSearching(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      const id = ++reqIdRef.current;
+      setSearching(true);
+      setSearchError(null);
+      try {
+        const url = `${PLACES_API}?country=${encodeURIComponent(country)}&q=${encodeURIComponent(q.trim())}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (id !== reqIdRef.current) return;
+        setResults(Array.isArray(json.results) ? json.results : []);
+      } catch (e) {
+        if (id !== reqIdRef.current) return;
+        setSearchError(e instanceof Error ? e.message : String(e));
+        setResults([]);
+      } finally {
+        if (id === reqIdRef.current) setSearching(false);
+      }
     }, 300);
   }
 
-  // Mode 3
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
+  // Mode 3 — Manual
   const [lat, setLat] = useState("");
   const [lon, setLon] = useState("");
 
@@ -146,7 +122,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               style={{ borderRadius: 4 }}
             />
             {country && (
-              <button onClick={() => { setCountry(""); setCountryQ(""); setLoadStatus("idle"); }}
+              <button onClick={() => { setCountry(""); setCountryQ(""); setResults([]); setPlaceQ(""); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 <X size={14} />
               </button>
@@ -157,7 +133,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               {filteredCountries.slice(0, 50).map(c => (
                 <li key={c.code}>
                   <button
-                    onClick={() => loadCountry(c.code)}
+                    onClick={() => selectCountry(c.code)}
                     className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted flex justify-between items-center"
                   >
                     <span>{c.name}</span>
@@ -176,37 +152,19 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
             <input
               value={placeQ}
               onChange={(e) => onSearch(e.target.value)}
-              disabled={loadStatus !== "ready"}
-              placeholder={
-                loadStatus === "idle" ? "Select a country first..." :
-                loadStatus === "loading" ? `Loading places for ${countryName}...` :
-                loadStatus === "error" ? "Failed to load places" :
-                `Search ${placeCount.toLocaleString()} places...`
-              }
+              disabled={!country}
+              placeholder={country ? `Search places in ${countryName}...` : "Select a country first..."}
               className="w-full pl-8 pr-3 py-2 bg-background border border-border text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
               style={{ borderRadius: 4 }}
             />
           </div>
 
-          {loadStatus === "loading" && (
-            <div className="mt-2">
-              <div className="h-1.5 w-full bg-muted overflow-hidden" style={{ borderRadius: 4 }}>
-                <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
-              </div>
-              <div className="mt-1 flex justify-between text-[10px] mono text-muted-foreground">
-                <span>{(received/1024).toFixed(0)} / {total ? (total/1024).toFixed(0) : "?"} KB</span>
-                <span>{progress.toFixed(0)}%</span>
-              </div>
-              {country && LARGE_COUNTRIES.has(country) && (
-                <p className="mt-1 text-[11px] text-warning">
-                  This country has a large place dataset. Search will be available shortly.
-                </p>
-              )}
-            </div>
+          {searching && (
+            <p className="mt-2 text-[11px] mono text-muted-foreground">searching…</p>
           )}
 
-          {loadStatus === "error" && (
-            <p className="mt-2 text-xs text-destructive mono">! {loadError}</p>
+          {searchError && (
+            <p className="mt-2 text-xs text-destructive mono">! {searchError}</p>
           )}
 
           {results.length > 0 && (
@@ -214,17 +172,21 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               {results.map((r, i) => (
                 <li key={i}>
                   <button
-                    onClick={() => onResolve({ lat: r.item.lat, lon: r.item.lon, label: `${r.item.name}${countryName ? ", " + countryName : ""}` })}
+                    onClick={() => onResolve({ lat: r.lat, lon: r.lon, label: `${r.name}${countryName ? ", " + countryName : ""}` })}
                     className="w-full text-left px-3 py-2 hover:bg-muted border-b border-border last:border-b-0"
                   >
-                    <div className="text-sm"><Highlight text={r.item.name} matches={r.matches} /></div>
+                    <div className="text-sm">{r.name}</div>
                     <div className="text-[11px] mono text-muted-foreground mt-0.5">
-                      {Math.abs(r.item.lat).toFixed(4)}°{r.item.lat >= 0 ? "N" : "S"}  {Math.abs(r.item.lon).toFixed(4)}°{r.item.lon >= 0 ? "E" : "W"}
+                      {Math.abs(r.lat).toFixed(4)}°{r.lat >= 0 ? "N" : "S"}  {Math.abs(r.lon).toFixed(4)}°{r.lon >= 0 ? "E" : "W"}
                     </div>
                   </button>
                 </li>
               ))}
             </ul>
+          )}
+
+          {!searching && !searchError && results.length === 0 && placeQ.trim().length >= 2 && country && (
+            <p className="mt-2 text-[11px] mono text-muted-foreground">no matches</p>
           )}
         </div>
       </section>
