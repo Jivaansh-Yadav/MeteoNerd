@@ -9,7 +9,6 @@ type PlaceResult = { name: string; lat: number; lon: number };
 
 const PLACES_API = "https://meteonerd-places.jivaanshyadav.workers.dev/search";
 
-/** Render text with Fuse match indices highlighted. */
 function Highlight({ text, indices }: { text: string; indices?: ReadonlyArray<readonly [number, number]> }) {
   if (!indices || indices.length === 0) return <>{text}</>;
   const parts: React.ReactNode[] = [];
@@ -33,7 +32,6 @@ function findMatch(matches: readonly FuseResultMatch[] | undefined, key: string)
 }
 
 export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation) => void }) {
-  // Mode 1 — Device
   const [geoError, setGeoError] = useState<string | null>(null);
   const geoSupported = typeof window !== "undefined" && "geolocation" in navigator;
 
@@ -47,7 +45,6 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
     );
   }
 
-  // Mode 2 — Country + Place
   const [country, setCountry] = useState<string>("");
   const [countryQ, setCountryQ] = useState("");
   const [showCountryList, setShowCountryList] = useState(false);
@@ -70,37 +67,41 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
   }, [countryQ, countryFuse]);
 
   const [placeQ, setPlaceQ] = useState("");
-  const [results, setResults] = useState<PlaceResult[]>([]);
+  const [rawResults, setRawResults] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reqIdRef = useRef(0);
 
-  // Fuse over fetched results to re-rank + highlight client-side
-  const placeMatches = useMemo(() => {
-    const q = placeQ.trim();
-    if (!q || results.length === 0) {
-      return results.map(item => ({ item, matches: undefined as readonly FuseResultMatch[] | undefined }));
-    }
-    const fuse = new Fuse(results, {
+  // Fuse over fetched results — identical config to country search
+  const placeFuse = useMemo(
+    () => new Fuse(rawResults, {
       keys: ["name"],
       includeMatches: true,
       threshold: 0.4,
       ignoreLocation: true,
       minMatchCharLength: 1,
-    });
-    const ranked = fuse.search(q).map(r => ({ item: r.item, matches: r.matches }));
-    // include any leftover results without fuzzy match at the bottom
+    }),
+    [rawResults]
+  );
+
+  const placeMatches = useMemo(() => {
+    const q = placeQ.trim();
+    if (!q || rawResults.length === 0) {
+      return rawResults.map(item => ({ item, matches: undefined as readonly FuseResultMatch[] | undefined }));
+    }
+    const ranked = placeFuse.search(q).map(r => ({ item: r.item, matches: r.matches }));
+    // append any results not caught by fuzzy at the bottom
     const seen = new Set(ranked.map(r => r.item));
-    for (const item of results) if (!seen.has(item)) ranked.push({ item, matches: undefined });
-    return ranked;
-  }, [placeQ, results]);
+    for (const item of rawResults) if (!seen.has(item)) ranked.push({ item, matches: undefined });
+    return ranked.slice(0, 10);
+  }, [placeQ, rawResults, placeFuse]);
 
   function selectCountry(code: string) {
     setCountry(code);
     setShowCountryList(false);
     setCountryQ(COUNTRIES.find(c => c.code === code)?.name || code);
-    setResults([]);
+    setRawResults([]);
     setPlaceQ("");
     setSearchError(null);
   }
@@ -109,22 +110,23 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
     setPlaceQ(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!country) return;
-    if (q.trim().length < 2) { setResults([]); setSearching(false); return; }
+    if (q.trim().length < 2) { setRawResults([]); setSearching(false); return; }
     debounceRef.current = setTimeout(async () => {
       const id = ++reqIdRef.current;
       setSearching(true);
       setSearchError(null);
       try {
-        const url = `${PLACES_API}?country=${encodeURIComponent(country)}&q=${encodeURIComponent(q.trim())}`;
+        // fetch 50 results so Fuse.js has enough to re-rank and highlight
+        const url = `${PLACES_API}?country=${encodeURIComponent(country)}&q=${encodeURIComponent(q.trim())}&limit=50`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (id !== reqIdRef.current) return;
-        setResults(Array.isArray(json.results) ? json.results : []);
+        setRawResults(Array.isArray(json.results) ? json.results : []);
       } catch (e) {
         if (id !== reqIdRef.current) return;
         setSearchError(e instanceof Error ? e.message : String(e));
-        setResults([]);
+        setRawResults([]);
       } finally {
         if (id === reqIdRef.current) setSearching(false);
       }
@@ -133,7 +135,6 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
 
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
 
-  // Mode 3 — Manual
   const [lat, setLat] = useState("");
   const [lon, setLon] = useState("");
 
@@ -154,7 +155,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
         <button
           onClick={useDevice}
           disabled={!geoSupported}
-          title={!geoSupported ? "Your browser does not support geolocation" : undefined}
+          title={!geoSupported ? "Your browser does not support Geolocation" : undefined}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ borderRadius: 4 }}
         >
@@ -175,12 +176,12 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               value={countryQ}
               onChange={(e) => { setCountryQ(e.target.value); setShowCountryList(true); }}
               onFocus={() => setShowCountryList(true)}
-              placeholder="Fuzzy search 250 countries..."
+              placeholder="Search 250 countries..."
               className="w-full px-3 py-2 bg-background border border-border text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               style={{ borderRadius: 4 }}
             />
             {country && (
-              <button onClick={() => { setCountry(""); setCountryQ(""); setResults([]); setPlaceQ(""); }}
+              <button onClick={() => { setCountry(""); setCountryQ(""); setRawResults([]); setPlaceQ(""); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 <X size={14} />
               </button>
@@ -204,7 +205,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
             </ul>
           )}
           {showCountryList && countryMatches.length === 0 && (
-            <p className="mt-2 text-[11px] mono text-muted-foreground">no countries match</p>
+            <p className="mt-2 text-[11px] mono text-muted-foreground">No matches!</p>
           )}
         </div>
 
@@ -216,14 +217,14 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               value={placeQ}
               onChange={(e) => onSearch(e.target.value)}
               disabled={!country}
-              placeholder={country ? `Fuzzy search places in ${countryName}...` : "Select a country first..."}
+              placeholder={country ? `Search places in ${countryName}...` : "Select a country first..."}
               className="w-full pl-8 pr-3 py-2 bg-background border border-border text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
               style={{ borderRadius: 4 }}
             />
           </div>
 
           {searching && (
-            <p className="mt-2 text-[11px] mono text-muted-foreground">searching…</p>
+            <p className="mt-2 text-[11px] mono text-muted-foreground">Searching…</p>
           )}
 
           {searchError && (
@@ -242,7 +243,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
                       <Highlight text={r.name} indices={findMatch(matches, "name")} />
                     </div>
                     <div className="text-[11px] mono text-muted-foreground mt-0.5">
-                      {Math.abs(r.lat).toFixed(4)}°{r.lat >= 0 ? "N" : "S"}  {Math.abs(r.lon).toFixed(4)}°{r.lon >= 0 ? "E" : "W"}
+                      {Math.abs(r.lat).toFixed(4)}°{r.lat >= 0 ? "N" : "S"}{"  "}{Math.abs(r.lon).toFixed(4)}°{r.lon >= 0 ? "E" : "W"}
                     </div>
                   </button>
                 </li>
@@ -250,8 +251,8 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
             </ul>
           )}
 
-          {!searching && !searchError && results.length === 0 && placeQ.trim().length >= 2 && country && (
-            <p className="mt-2 text-[11px] mono text-muted-foreground">no matches</p>
+          {!searching && !searchError && rawResults.length === 0 && placeQ.trim().length >= 2 && country && (
+            <p className="mt-2 text-[11px] mono text-muted-foreground">No matches!</p>
           )}
         </div>
       </section>
