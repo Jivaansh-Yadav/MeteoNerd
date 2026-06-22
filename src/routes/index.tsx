@@ -62,8 +62,8 @@ function MeteoNerd() {
       <header className="pt-6 px-4 sm:px-6 max-w-6xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Cloud size={22} className="text-primary" />
             <a href="/">
+            <Cloud size={22} className="text-primary" />
             <h1 className="text-lg font-bold tracking-tight">
               MeteoNerd<span className="text-primary">.</span>
             </h1>
