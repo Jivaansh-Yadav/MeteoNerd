@@ -20,19 +20,6 @@ export function Hero({ data, location, model, units }: Props) {
   const sunrise = daily.sunrise?.[0];
   const sunset = daily.sunset?.[0];
 
-  const ticker = [
-    `TEMP ${format("temperature_2m", cur.temperature_2m, units)}`,
-    `FEELS ${format("apparent_temperature", cur.apparent_temperature, units)}`,
-    `HUMIDITY ${format("relative_humidity_2m", cur.relative_humidity_2m, units)}`,
-    `WIND ${format("wind_speed_10m", cur.wind_speed_10m, units)} ${dirToCardinal(cur.wind_direction_10m)}`,
-    `UV ${data?.hourly?.uv_index?.[0] != null ? data.hourly.uv_index[0].toFixed(1) : "—"}`,
-    `CAPE ${data?.hourly?.cape?.[0] != null ? data.hourly.cape[0].toFixed(0) + " J/kg" : "—"}`,
-    `VIS ${data?.hourly?.visibility?.[0] != null ? format("visibility", data.hourly.visibility[0], units) : "—"}`,
-    `PRECIP_PROB ${data?.hourly?.precipitation_probability?.[0] != null ? data.hourly.precipitation_probability[0] + "%" : "—"}`,
-    `SOIL_MOIST ${data?.hourly?.soil_moisture_0_to_1cm?.[0] != null ? data.hourly.soil_moisture_0_to_1cm[0].toFixed(3) + " m³/m³" : "—"}`,
-    `BOUNDARY_LAYER ${data?.hourly?.boundary_layer_height?.[0] != null ? format("boundary_layer_height", data.hourly.boundary_layer_height[0], units) : "—"}`,
-  ].join("  ·  ");
-
   return (
     <section
       className="text-white border border-border overflow-hidden"
@@ -57,12 +44,6 @@ export function Hero({ data, location, model, units }: Props) {
             <div className="mono opacity-80 mt-2">MODEL: {model}</div>
             <div className="mono opacity-80">{isDay ? "DAYTIME" : "NIGHT"}</div>
           </div>
-        </div>
-      </div>
-      <div className="border-t border-white/20 bg-black/20 overflow-hidden">
-        <div className="mn-marquee py-2 text-[11px] mono">
-          <span className="px-4">{ticker}</span>
-          <span className="px-4">{ticker}</span>
         </div>
       </div>
     </section>
