@@ -63,9 +63,11 @@ function MeteoNerd() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Cloud size={22} className="text-primary" />
+            <a href="/">
             <h1 className="text-lg font-bold tracking-tight">
               MeteoNerd<span className="text-primary">.</span>
             </h1>
+            </a>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <select
