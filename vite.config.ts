@@ -15,7 +15,7 @@ export default defineConfig({
         const dir = options.dir;
         if (!dir || !dir.includes("dist/server")) return;
         // Some pipelines emit index.mjs; the preview-server plugin imports server.js.
-        const candidates = ["index.mjs", "server.mjs"];
+        const candidates = ["_ssr/ssr.mjs", "index.mjs", "server.mjs"];
         const dest = join(dir, "server.js");
         if (existsSync(dest)) return;
         for (const name of candidates) {
