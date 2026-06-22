@@ -1,5 +1,5 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import { copyFileSync, existsSync } from "node:fs";
+import { writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 export default defineConfig({
@@ -9,22 +9,19 @@ export default defineConfig({
   },
   plugins: [
     {
-      name: "lovable-server-entry-alias",
+      name: "lovable-server-entry-shim",
       apply: "build",
       writeBundle(options) {
         const dir = options.dir;
         if (!dir || !dir.includes("dist/server")) return;
-        // Some pipelines emit index.mjs; the preview-server plugin imports server.js.
-        const candidates = ["_ssr/ssr.mjs", "index.mjs", "server.mjs"];
+        // The preview-server plugin imports dist/server/server.js during prerender,
+        // but nitro emits the cloudflare-module worker as index.mjs (which needs a
+        // real CF execution context). Our SSR wrapper lives in _ssr/ssr.mjs and
+        // supplies a Node-safe shim, so route the preview import there instead.
+        const wrapper = join(dir, "_ssr/ssr.mjs");
         const dest = join(dir, "server.js");
-        if (existsSync(dest)) return;
-        for (const name of candidates) {
-          const src = join(dir, name);
-          if (existsSync(src)) {
-            copyFileSync(src, dest);
-            return;
-          }
-        }
+        if (!existsSync(wrapper) || existsSync(dest)) return;
+        writeFileSync(dest, `export { default } from "./_ssr/ssr.mjs";\n`);
       },
     },
   ],
