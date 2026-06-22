@@ -41,7 +41,8 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
+      const safeCtx = ctx ?? { context: { waitUntil: () => {}, passThroughOnException: () => {} } };
+      const response = await handler.fetch(request, env ?? {}, safeCtx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);
