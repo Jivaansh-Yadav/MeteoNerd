@@ -139,7 +139,25 @@ export function WeatherDisplay({ data, units, lat, lon }: Props) {
       </AccordionSection>
 
       {/* Upper Air */}
-      <AccordionSection title="Upper Air / Pressure Levels" icon={<Layers size={16} />} accentColor="#8B5CF6">
+      <AccordionSection
+        title="Upper Air / Pressure Levels"
+        icon={<Layers size={16} />}
+        accentColor="#8B5CF6"
+        rawJson={(() => {
+          const out: Record<string, unknown> = {};
+          for (const l of PRESSURE_LEVELS) {
+            out[`${l}hPa`] = {
+              temperature: hourly[`temperature_${l}hPa`]?.[curHourIdx] ?? null,
+              relative_humidity: hourly[`relative_humidity_${l}hPa`]?.[curHourIdx] ?? null,
+              cloud_cover: hourly[`cloud_cover_${l}hPa`]?.[curHourIdx] ?? null,
+              wind_speed: hourly[`wind_speed_${l}hPa`]?.[curHourIdx] ?? null,
+              wind_direction: hourly[`wind_direction_${l}hPa`]?.[curHourIdx] ?? null,
+              geopotential_height: hourly[`geopotential_height_${l}hPa`]?.[curHourIdx] ?? null,
+            };
+          }
+          return out;
+        })()}
+      >
         {data.errors?.pressureLevels ? (
           <div className="text-[12px] mono text-muted-foreground p-3 border border-border" style={{ borderRadius: 4 }}>
             Pressure level data unavailable.
