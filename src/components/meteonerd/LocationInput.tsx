@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Fuse, { type FuseResultMatch } from "fuse.js";
 import { COUNTRIES } from "@/lib/countries";
 import { MapPin, Search, Crosshair, X } from "lucide-react";
 
@@ -7,6 +8,29 @@ export type ResolvedLocation = { lat: number; lon: number; label: string };
 type PlaceResult = { name: string; lat: number; lon: number };
 
 const PLACES_API = "https://meteonerd-places.jivaanshyadav.workers.dev/search";
+
+/** Render text with Fuse match indices highlighted. */
+function Highlight({ text, indices }: { text: string; indices?: ReadonlyArray<readonly [number, number]> }) {
+  if (!indices || indices.length === 0) return <>{text}</>;
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  const sorted = [...indices].sort((a, b) => a[0] - b[0]);
+  sorted.forEach(([start, end], i) => {
+    if (start > cursor) parts.push(text.slice(cursor, start));
+    parts.push(
+      <mark key={i} className="bg-primary/25 text-foreground rounded-[2px] px-0.5">
+        {text.slice(start, end + 1)}
+      </mark>
+    );
+    cursor = end + 1;
+  });
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return <>{parts}</>;
+}
+
+function findMatch(matches: readonly FuseResultMatch[] | undefined, key: string) {
+  return matches?.find(m => m.key === key)?.indices as ReadonlyArray<readonly [number, number]> | undefined;
+}
 
 export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation) => void }) {
   // Mode 1 — Device
@@ -27,9 +51,23 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
   const [country, setCountry] = useState<string>("");
   const [countryQ, setCountryQ] = useState("");
   const [showCountryList, setShowCountryList] = useState(false);
-  const filteredCountries = countryQ
-    ? COUNTRIES.filter(c => c.name.toLowerCase().includes(countryQ.toLowerCase()) || c.code.toLowerCase() === countryQ.toLowerCase())
-    : COUNTRIES;
+
+  const countryFuse = useMemo(
+    () => new Fuse(COUNTRIES, {
+      keys: ["name", "code"],
+      includeMatches: true,
+      threshold: 0.4,
+      ignoreLocation: true,
+      minMatchCharLength: 1,
+    }),
+    []
+  );
+
+  const countryMatches = useMemo(() => {
+    const q = countryQ.trim();
+    if (!q) return COUNTRIES.map(c => ({ item: c, matches: undefined as readonly FuseResultMatch[] | undefined }));
+    return countryFuse.search(q).map(r => ({ item: r.item, matches: r.matches }));
+  }, [countryQ, countryFuse]);
 
   const [placeQ, setPlaceQ] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -37,6 +75,26 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
   const [searchError, setSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reqIdRef = useRef(0);
+
+  // Fuse over fetched results to re-rank + highlight client-side
+  const placeMatches = useMemo(() => {
+    const q = placeQ.trim();
+    if (!q || results.length === 0) {
+      return results.map(item => ({ item, matches: undefined as readonly FuseResultMatch[] | undefined }));
+    }
+    const fuse = new Fuse(results, {
+      keys: ["name"],
+      includeMatches: true,
+      threshold: 0.4,
+      ignoreLocation: true,
+      minMatchCharLength: 1,
+    });
+    const ranked = fuse.search(q).map(r => ({ item: r.item, matches: r.matches }));
+    // include any leftover results without fuzzy match at the bottom
+    const seen = new Set(ranked.map(r => r.item));
+    for (const item of results) if (!seen.has(item)) ranked.push({ item, matches: undefined });
+    return ranked;
+  }, [placeQ, results]);
 
   function selectCountry(code: string) {
     setCountry(code);
@@ -117,7 +175,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               value={countryQ}
               onChange={(e) => { setCountryQ(e.target.value); setShowCountryList(true); }}
               onFocus={() => setShowCountryList(true)}
-              placeholder="Search 250 countries..."
+              placeholder="Fuzzy search 250 countries..."
               className="w-full px-3 py-2 bg-background border border-border text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               style={{ borderRadius: 4 }}
             />
@@ -128,20 +186,25 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               </button>
             )}
           </div>
-          {showCountryList && filteredCountries.length > 0 && (
+          {showCountryList && countryMatches.length > 0 && (
             <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto bg-popover border border-border" style={{ borderRadius: 4 }}>
-              {filteredCountries.slice(0, 50).map(c => (
+              {countryMatches.slice(0, 50).map(({ item: c, matches }) => (
                 <li key={c.code}>
                   <button
                     onClick={() => selectCountry(c.code)}
                     className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted flex justify-between items-center"
                   >
-                    <span>{c.name}</span>
-                    <span className="mono text-xs text-muted-foreground">{c.code}</span>
+                    <span><Highlight text={c.name} indices={findMatch(matches, "name")} /></span>
+                    <span className="mono text-xs text-muted-foreground">
+                      <Highlight text={c.code} indices={findMatch(matches, "code")} />
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
+          )}
+          {showCountryList && countryMatches.length === 0 && (
+            <p className="mt-2 text-[11px] mono text-muted-foreground">no countries match</p>
           )}
         </div>
 
@@ -153,7 +216,7 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
               value={placeQ}
               onChange={(e) => onSearch(e.target.value)}
               disabled={!country}
-              placeholder={country ? `Search places in ${countryName}...` : "Select a country first..."}
+              placeholder={country ? `Fuzzy search places in ${countryName}...` : "Select a country first..."}
               className="w-full pl-8 pr-3 py-2 bg-background border border-border text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
               style={{ borderRadius: 4 }}
             />
@@ -167,15 +230,17 @@ export function LocationInput({ onResolve }: { onResolve: (loc: ResolvedLocation
             <p className="mt-2 text-xs text-destructive mono">! {searchError}</p>
           )}
 
-          {results.length > 0 && (
+          {placeMatches.length > 0 && (
             <ul className="mt-2 max-h-80 overflow-auto border border-border bg-popover" style={{ borderRadius: 4 }}>
-              {results.map((r, i) => (
+              {placeMatches.map(({ item: r, matches }, i) => (
                 <li key={i}>
                   <button
                     onClick={() => onResolve({ lat: r.lat, lon: r.lon, label: `${r.name}${countryName ? ", " + countryName : ""}` })}
                     className="w-full text-left px-3 py-2 hover:bg-muted border-b border-border last:border-b-0"
                   >
-                    <div className="text-sm">{r.name}</div>
+                    <div className="text-sm">
+                      <Highlight text={r.name} indices={findMatch(matches, "name")} />
+                    </div>
                     <div className="text-[11px] mono text-muted-foreground mt-0.5">
                       {Math.abs(r.lat).toFixed(4)}°{r.lat >= 0 ? "N" : "S"}  {Math.abs(r.lon).toFixed(4)}°{r.lon >= 0 ? "E" : "W"}
                     </div>
