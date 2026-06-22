@@ -66,7 +66,6 @@ function MeteoNerd() {
             <h1 className="text-lg font-bold tracking-tight">
               MeteoNerd<span className="text-primary">.</span>
             </h1>
-            <span className="text-[10px] mono text-muted-foreground uppercase tracking-wider ml-2">v1</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <select
@@ -151,7 +150,7 @@ function MeteoNerd() {
       </main>
 
       <footer className="px-4 sm:px-6 max-w-6xl mx-auto py-8 text-center text-[11px] mono text-muted-foreground">
-        Data: open-meteo.com · WMO codes · 16-day forecast · {model}
+        Data: open-meteo.com · Developed-by: Jivaansh Yadav
       </footer>
     </div>
   );
