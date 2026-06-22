@@ -201,19 +201,35 @@ export function WeatherDisplay({ data, units, lat, lon }: Props) {
         {!supportsNativeMinutely15(lat, lon) && (
           <p className="text-[11px] text-warning mb-3">15-min data is interpolated for this region.</p>
         )}
-        <div className="overflow-x-auto">
-          <div className="flex gap-2 pb-2 min-w-max">
-            {(min15.time ?? []).slice(0, 96).map((t: string, i: number) => (
-              <div key={i} className="border border-border p-2 text-[11px] mono min-w-[110px]" style={{ borderRadius: 4 }}>
-                <div className="text-muted-foreground">{t.slice(11, 16)}</div>
-                <div className="mt-1">{format("temperature_2m", min15.temperature_2m?.[i], units)}</div>
-                <div className="text-muted-foreground">{format("precipitation", min15.precipitation?.[i], units)}</div>
-                <div className="text-muted-foreground">{format("wind_speed_10m", min15.wind_speed_10m?.[i], units)}</div>
-                <div className="text-muted-foreground text-[10px]">{wmoText(min15.weather_code?.[i])}</div>
+        {(() => {
+          const times: string[] = min15.time ?? [];
+          if (times.length === 0) {
+            return <p className="text-[11px] mono text-muted-foreground">No 15-minutely data available.</p>;
+          }
+          // Start from the first slot >= now (fallback to 0)
+          const nowMs = Date.now();
+          let startIdx = times.findIndex(t => new Date(t).getTime() >= nowMs);
+          if (startIdx < 0) startIdx = 0;
+          const slice = times.slice(startIdx, startIdx + 96);
+          return (
+            <div className="overflow-x-auto">
+              <div className="flex gap-2 pb-2 min-w-max">
+                {slice.map((t: string, j: number) => {
+                  const i = startIdx + j;
+                  return (
+                    <div key={i} className="border border-border p-2 text-[11px] mono min-w-[110px]" style={{ borderRadius: 4 }}>
+                      <div className="text-muted-foreground">{t.slice(5, 10)} {t.slice(11, 16)}</div>
+                      <div className="mt-1">{format("temperature_2m", min15.temperature_2m?.[i], units)}</div>
+                      <div className="text-muted-foreground">{format("precipitation", min15.precipitation?.[i], units)}</div>
+                      <div className="text-muted-foreground">{format("wind_speed_10m", min15.wind_speed_10m?.[i], units)}</div>
+                      <div className="text-muted-foreground text-[10px]">{wmoText(min15.weather_code?.[i])}</div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          );
+        })()}
       </AccordionSection>
 
       {/* Hourly */}
