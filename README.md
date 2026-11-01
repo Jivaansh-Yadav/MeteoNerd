@@ -1,206 +1,245 @@
-# MeteoNerd
+<div align="center">
 
-> Point anywhere on Earth. Get everything the atmosphere has.
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:030c14,55:0b2b40,100:0ea5e9&height=235&section=header&text=MeteoNerd&fontSize=46&fontColor=eaf8ff&fontAlignY=40&desc=Every%20Open-Meteo%20variable%2C%20none%20of%20them%20hidden&descSize=17&descAlignY=62&animation=twinkling" alt="MeteoNerd" width="100%">
 
-A hyperlocal weather intelligence web app that exposes every atmospheric parameter Open-Meteo provides — organized, categorized, and always complete. Built for people who want more than a temperature and a cloud icon.
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=500&size=19&duration=3200&pause=900&color=38bdf8&center=true&vCenter=true&width=700&lines=Not%20a%20weather%20app%3A%20a%20window%20onto%20the%20model;Temperature%2C%20CAPE%2C%20boundary%20layer%2C%20soil%20moisture%2C%20radiation;3%20requests%20in%20flight%2C%20100%20ms%20apart%2C%20never%20rate-limited" alt="Typing animation" />
 
----
+<br />
 
-## Live
+<a href="https://meteonerd.pages.dev/"><img src="https://img.shields.io/badge/%E2%96%B6%20Read%20the%20sky-0ea5e9?style=for-the-badge&labelColor=030c14&logo=cloudflarepages&logoColor=7dd3fc" alt="Read the sky" /></a>
 
-**https://meteonerd.pages.dev**
+</div>
 
----
+<div align="center">
 
-## What It Does
+<img src="https://img.shields.io/badge/Source-Open--Meteo-38bdf8?style=flat-square&labelColor=030c14" alt="Open-Meteo" />
+<img src="https://img.shields.io/badge/Forecast-16%20days-0ea5e9?style=flat-square&labelColor=030c14" alt="16 day forecast" />
+<img src="https://img.shields.io/badge/Model-selectable-0284c7?style=flat-square&labelColor=030c14" alt="Selectable model" />
+<img src="https://img.shields.io/badge/Places-13.4M%20via%20D1-7dd3fc?style=flat-square&labelColor=030c14" alt="13.4 million places" />
+<img src="https://img.shields.io/badge/Units-metric%20%2B%20imperial-38bdf8?style=flat-square&labelColor=030c14" alt="Metric and imperial" />
 
-MeteoNerd fetches the full depth of Open-Meteo's forecast API for any location on Earth and presents it in collapsible category sections. No data is hidden, summarized away, or omitted. Every parameter is labelled, valued, and unitized.
+</div>
 
-It is not a casual weather app. It is a weather instrument.
+<br />
 
----
+<div align="center">
 
-## Features
+### <a href="https://meteonerd.pages.dev/">meteonerd.pages.dev</a>
 
-### Location Input — Three Modes
+<sub>Pick a place by name, by GPS, or by coordinates. Then read as much or as little as you want.</sub>
 
-| Mode | Description |
-|------|-------------|
-| **Device Location** | One-click GPS via browser `navigator.geolocation` |
-| **Country + Place Search** | Select from 250 countries → fuzzy search 13.4M+ places worldwide |
-| **Manual Coordinates** | Enter latitude and longitude directly |
-
-Place search is powered by a Cloudflare D1 database containing **13.4 million places** sourced from GeoNames, queried via a Cloudflare Worker with Fuse.js client-side re-ranking and match highlighting.
+</div>
 
 ---
 
-### Weather Data
+<div align="center">
 
-All data is fetched from the [Open-Meteo API](https://open-meteo.com/en/docs) in parallel calls and merged into a unified response. Parameters are organized into accordion sections:
+## What it is
 
-| Section | Key Parameters |
-|---------|---------------|
-| **Current Conditions** | Temperature, humidity, wind, precipitation, pressure, weather code |
-| **Temperature & Humidity** | 2m/80m/120m/180m temps, dew point, wet bulb, apparent temp, water vapour |
-| **Wind** | Speed and direction at 10m/80m/120m/180m, gusts |
-| **Precipitation** | Rain, showers, snowfall, snow depth, probability, all daily sums |
-| **Cloud & Atmosphere** | Cloud cover (total/low/mid/high), visibility, ET₀, vapour pressure deficit, boundary layer height |
-| **Solar & Radiation** | Shortwave, direct, diffuse, DNI, GTI, terrestrial radiation (averaged + instant), UV index, sunshine duration |
-| **Soil** | Temperature and moisture at 0/6/18/54cm depths |
-| **Pressure & Instability** | Surface pressure, MSLP, CAPE, lifted index, convective inhibition, freezing level |
-| **Upper Air / Pressure Levels** | Temperature, humidity, cloud cover, wind, geopotential height at 19 pressure levels from 1000hPa to 30hPa |
-| **15-Minutely** | High-resolution sub-hourly data (interpolated outside Europe/North America) |
-| **Hourly Forecast** | 168-hour scrollable timeline |
-| **Daily Summary** | 16-day aggregates — min/max/mean for all major variables |
+</div>
+
+Most weather apps answer "will I need a jacket". This one answers "what is the atmosphere doing" — and it does not decide for you which of those questions you asked. Every variable Open-Meteo publishes for a point is fetched and shown, folded into accordion sections so the everyday numbers (temperature, rain, wind) sit at the top and the boundary-layer and radiation columns sit below, closed, waiting.
+
+It is built for the person who wants to see **CAPE at 700 hPa** next to the surface temperature, and equally for the person who only ever opens the first section. Same page, same fetch, different depth.
+
+<div align="center">
+
+<sub>No API key, no account, no ads. The data is Open-Meteo's; the interface is the work.</sub>
+
+</div>
 
 ---
 
-### Additional Features
+<div align="center">
 
-- **Forecast model selector** — ECMWF, GFS, ICON, Météo-France, JMA, GEM, UK Met Office, KMA, CMA, BOM, or auto best-match
-- **Unit toggle** — Metric / Imperial, applied client-side without re-fetching
-- **Raw JSON toggle** — per accordion, view the exact API response subset
-- **Light / Dark theme** — system preference detected on load, persisted to localStorage
-- **WMO weather code mapping** — all codes mapped to human-readable condition strings
-- **Condition-reactive hero** — static sky gradient tied to current weather condition and day/night state
-- **Telemetry ticker** — live scrolling strip of 10 key values across the hero card
+## The three ways in
 
----
+</div>
 
-## Architecture
+<ul>
+<li><b>Country, then place.</b> Pick from a searchable ISO country list, then type at least two characters of a place name. Results come from a places API over a <b>13.4 million</b>-row GeoNames table, and are re-ranked in the browser with Fuse so a partial, misspelled, accented query still lands.</li>
+<li><b>My location.</b> The browser's geolocation, resolved to a label and coordinates — one tap, no typing.</li>
+<li><b>Exact coordinates.</b> Latitude and longitude, for a point with no name: a ridge, a lake, a field.</li>
+</ul>
 
-```
-Browser
-  └── MeteoNerd (TanStack Start, React 19, Tailwind, shadcn/ui)
-        ├── Location Input
-        │     ├── Mode 1: navigator.geolocation
-        │     ├── Mode 2: Country dropdown → Place search
-        │     │           └── Cloudflare Worker (meteonerd-places)
-        │     │                 └── Cloudflare D1 (13.4M places, GeoNames)
-        │     └── Mode 3: Manual lat/lon
-        │
-        └── Weather Fetch (4 parallel calls)
-              ├── Call 1: current + core hourly + daily → Open-Meteo API
-              ├── Call 2: atmosphere + radiation + soil → Open-Meteo API
-              ├── Call 3: pressure level variables → Open-Meteo API
-              └── Call 4: minutely_15 → Open-Meteo API
-```
+<div align="center">
+
+## What is inside
+
+</div>
+
+<ul>
+<li><b>The full variable set</b> — current, hourly, daily and 15-minute series, including pressure-level temperature, humidity, cloud cover, wind speed and direction, geopotential height and vertical velocity.</li>
+<li><b>Selectable model</b> — <code>auto</code> by default; pick a specific Open-Meteo model when you want to see what one source says rather than the blend.</li>
+<li><b>16 forecast days</b> — the API's maximum, requested every time.</li>
+<li><b>Metric and imperial, per value</b> — a units toggle that knows a temperature is not a speed; see the conversion table below.</li>
+<li><b>WMO code names</b> — every condition code rendered as words ("Depositing rime fog", not "48").</li>
+<li><b>Partial results by design</b> — if the pressure-level chunk fails, the rest of the page still renders with a stated gap instead of an error screen.</li>
+<li><b>Accordion sections</b> — closed by default below the first, so 16 days × dozens of variables never arrives as a wall.</li>
+<li><b>Dark and light</b> — one toggle, palette defined once as tokens.</li>
+</ul>
 
 ---
 
-## Tech Stack
+<div align="center">
 
-| Layer | Technology |
-|-------|------------|
-| Framework | [TanStack Start](https://tanstack.com/start) + React 19 |
-| Styling | Tailwind CSS v4 + shadcn/ui |
-| Routing | TanStack Router |
-| Data fetching | TanStack Query |
-| Search | [Fuse.js](https://fusejs.io/) |
-| Weather API | [Open-Meteo](https://open-meteo.com/) (free, no key required) |
-| Places database | Cloudflare D1 (SQLite at edge) |
-| Places API | Cloudflare Worker |
-| Hosting | Cloudflare Pages |
-| Place data source | [GeoNames](https://www.geonames.org/) allCountries dump |
+## Stack
 
----
+</div>
 
-## Places Data Pipeline
+<ul>
+<li><b>Vite + React 19 + TanStack Router</b> — a client-rendered app; the data is live and per-location, so there is nothing to prerender.</li>
+<li><b>Open-Meteo</b> — free, keyless, and the only weather source. No normalisation layer over a second provider.</li>
+<li><b>Cloudflare Pages + a separate Worker</b> — the site is static; the places search is a Worker in front of D1.</li>
+<li><b>Fuse.js</b> — re-ranking both the country list and fetched place names in the browser, so the worker only has to return candidates.</li>
+<li><b>Radix + Tailwind</b> — accordions, dialogs and the theme, via the standard shadcn/ui pieces.</li>
+</ul>
 
-The worldwide place search is built from a one-time data pipeline:
+<div align="center">
 
-```
-GeoNames country dumps (250 × .txt.gz)
-  → Downloaded via parallel curl (bash script, -P 10)
-  → Stripped to name / lat / lon only (awk)
-  → Imported into SQLite (places.db, 953MB)
-  → Dumped to SQL (sqlite3 .dump)
-  → Transaction statements stripped (sed)
-  → Uploaded to Cloudflare D1 via wrangler
-  → 13,439,723 rows, indexed on (country, name)
-```
+<img src="https://skillicons.dev/icons?i=react,ts,vite,tailwind,cloudflare,git" alt="React, TypeScript, Vite, Tailwind, Cloudflare, Git" />
 
-Search query:
-```sql
-SELECT name, lat, lon
-FROM places
-WHERE country = ?
-AND name LIKE ?
-ORDER BY name ASC
-LIMIT 50
-```
-
-Results are re-ranked client-side with Fuse.js fuzzy search and rendered with match-boundary highlighting identical to the country search.
+</div>
 
 ---
 
-## Places Worker API
+<div align="center">
 
-Base URL: `https://meteonerd-places.jivaanshyadav.workers.dev`
+## Under the hood
 
-| Endpoint | Parameters | Description |
-|----------|-----------|-------------|
-| `/search` | `country` (ISO 2-letter), `q` (min 2 chars), `limit` (max 50) | Search places in a country |
-| `/countries` | — | List all distinct country codes in the database |
+</div>
 
-Example:
-```
-GET /search?country=IN&q=Mumb&limit=50
+<details>
+<summary><b>Chunking</b> — why one request is impossible and ten are not</summary>
 
-{
-  "results": [
-    { "name": "Mumbai", "lat": 19.07283, "lon": 72.88261 },
-    { "name": "Mumbai Suburban", "lat": 19.12636, "lon": 72.84897 },
-    ...
-  ]
-}
-```
+<br />
+
+<p>Open-Meteo rejects very long variable lists in a single query string, and hundreds of hourly variables in one response is a payload no phone wants to parse. So every group is split into chunks of <b>10</b> variables, each chunk becoming its own request:</p>
+
+<pre><code>const CHUNK_SIZE = 10;
+const currentChunks        = chunk(CURRENT_VARS, CHUNK_SIZE);
+const hourlyBaseChunks     = chunk(HOURLY_BASE, CHUNK_SIZE);
+const hourlyPressureChunks = chunk(HOURLY_PRESSURE, CHUNK_SIZE);
+const dailyChunks          = chunk(DAILY_VARS, CHUNK_SIZE);
+const minutelyChunks       = chunk(MINUTELY_VARS, CHUNK_SIZE);</code></pre>
+
+<p>Every URL shares the point, <code>timezone=auto</code> and <code>forecast_days=16</code>; only the variable list differs. The responses are merged back into one <code>WeatherResult</code>, so the UI never knows how many calls it took.</p>
+
+</details>
+
+<details>
+<summary><b>Politeness</b> — the part most Open-Meteo clients get wrong</summary>
+
+<br />
+
+<p>Dozens of parallel requests is how an IP gets a <code>429</code>. This client uses <b>3 concurrent workers</b> with a <b>100 ms</b> gap between each request, and a retry loop that reads the server's own advice before guessing:</p>
+
+<pre><code>if (res.status === 429) {
+  const retryAfter = res.headers.get("Retry-After");
+  // honour Retry-After when present, otherwise 1s, 2s, 4s, 8s, 16s
+  await sleep(Number(retryAfter) &gt; 0 ? Number(retryAfter) * 1000
+                                      : 1000 * Math.pow(2, attempt));
+}</code></pre>
+
+<p>Five attempts, then the chunk is marked failed and returned as an error rather than thrown. A weather page that renders ninety percent of itself is more useful than one that renders a red box.</p>
+
+</details>
+
+<details>
+<summary><b>Degrading in three groups, not one</b></summary>
+
+<br />
+
+<p>Failures are aggregated by <i>what they cost the reader</i>:</p>
+
+<ul>
+<li><b><code>core</code></b> — current, hourly base, daily. If this is missing, the page has no weather and says so.</li>
+<li><b><code>pressureLevels</code></b> — the upper-air columns. Losing them narrows the nerd section, nothing else.</li>
+<li><b><code>minutely</code></b> — the 15-minute series. Losing it drops one section entirely; <code>minutely_15</code> is returned as <code>undefined</code> only when <b>every</b> minutely chunk failed, so a partial series is still shown.</li>
+</ul>
+
+<p>That last condition is a deliberate detail: half a nowcast is data, and hiding it because the other half failed would be a worse product.</p>
+
+</details>
+
+<details>
+<summary><b>Units as a property of the variable, not of the request</b></summary>
+
+<br />
+
+<p>This app never passes <code>temperature_unit</code> or <code>windspeed_unit</code> to the API. It asks for metric and converts on display, driven by a <code>kind</code> attached to each variable name:</p>
+
+<pre><code>temp      1.0°C    ->  33.8°F
+speed     1.0 km/h  ->  0.62 mph
+precip    1.0 mm    ->  0.039 in
+pressure  1.0 hPa   ->  0.0295 inHg
+distance  1000 m    ->  0.62 mi
+height    1.0 m     ->  3.28 ft</code></pre>
+
+<p>Two benefits. The cache key is the location, not the location <i>and</i> the unit system, so toggling units costs zero requests. And a single value cannot be misinterpreted — a pressure shown with the wrong unit is worse than a pressure shown in the wrong system.</p>
+
+<p>Special cases live in the same switch: <code>is_day</code> is a boolean rendered as <i>Day</i>/<i>Night</i> rather than <code>1</code>, and a missing value renders as an em dash, never as <code>NaN</code>.</p>
+
+</details>
+
+<details>
+<summary><b>Places search, split across the wire</b></summary>
+
+<br />
+
+<p>13.4 million place names cannot be shipped to a browser, and a pure server-side search cannot do fuzzy matching well. The split:</p>
+
+<ul>
+<li><b>Worker + D1</b> at <code>meteonerd-places…workers.dev/search</code> answers "which rows match this prefix in this country" — a query SQLite is good at.</li>
+<li><b>Fuse.js in the browser</b> re-ranks what comes back, using the same configuration as the country search, so both inputs feel identical to type into.</li>
+</ul>
+
+<p>Countries themselves are a small local list of ISO codes and English names — no request, no spinner, instant filtering.</p>
+
+</details>
 
 ---
 
-## Running Locally
+<div align="center">
 
-```bash
-git clone https://github.com/Jivaansh-Yadav/MeteoNerd.git
+## Project structure
+
+</div>
+
+<pre><code>MeteoNerd/
+├── src/components/meteonerd/
+│   ├── LocationInput.tsx      # country → place, GPS, coordinates
+│   ├── WeatherDisplay.tsx     # sections built from the merged result
+│   ├── AccordionSection.tsx
+│   └── ThemeToggle.tsx
+├── src/lib/
+│   ├── weather.ts             # chunking, concurrency, retry, merge
+│   ├── weather-params.ts      # every variable list + its unit kind
+│   ├── units.ts               # per-kind conversion
+│   ├── wmo.ts                 # code → words
+│   └── countries.ts           # ISO 3166 names
+├── src/routes/                # index + root
+└── public/_routes.json</code></pre>
+
+---
+
+<div align="center">
+
+## Run it
+
+</div>
+
+<pre><code>git clone https://github.com/Jivaansh-Yadav/MeteoNerd.git
 cd MeteoNerd
 npm install
-npm run dev
-```
+npm run dev            # vite dev</code></pre>
 
-Open `http://localhost:3000`.
+<p>No API key is needed to read weather. Place search through the hosted worker works out of the box; to run it against your own D1 database, point <code>PLACES_API</code> in <code>LocationInput.tsx</code> at your worker.</p>
 
-No environment variables required — Open-Meteo is free and keyless. The places Worker is a public endpoint.
+<div align="center">
 
----
+<sub>Built to answer "what does the model actually say", not "should I take an umbrella". The umbrella answer is in the first section.</sub>
 
-## Deployment
+</div>
 
-Deployed on **Cloudflare Pages** with the following build settings:
-
-| Setting | Value |
-|---------|-------|
-| Build command | `npm run build && cp dist/client/_shell.html dist/client/index.html` |
-| Build output directory | `dist/client` |
-| Node.js version | 22 |
-
-The `cp` step copies TanStack Start's prerendered `_shell.html` to `index.html` so Cloudflare Pages can serve it as the SPA entry point. The `_redirects` file routes all paths to `index.html`.
-
----
-
-## Design
-
-- **Light-first** with dark mode toggle
-- **JetBrains Mono** for all data values and units
-- **Inter** for labels, headings, UI chrome
-- No background animations — the hero gradient is static CSS, set once on fetch
-- No box shadows, border radius capped at 4px
-- Condition-reactive hero gradients (clear day, rain, thunderstorm, snow, haze, night etc.)
-- Category color-coded accordions with Lucide icons
-
----
-
-## Data Sources & Credits
-
-- Weather data — [Open-Meteo](https://open-meteo.com/) (free, open-source)
-- Place names and coordinates — [GeoNames](https://www.geonames.org/) (CC BY 4.0)
-- Icons — [Lucide](https://lucide.dev/)
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:030c14,55:0b2b40,100:0ea5e9&height=110&section=footer&reversal=true" alt="" width="100%">
